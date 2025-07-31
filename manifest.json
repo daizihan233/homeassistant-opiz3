@@ -2,7 +2,7 @@
   "domain": "opiz3_monitor",
   "name": "Orange Pi Zero 3 Monitor",
   "version": "1.2.0",
-  "requirements": ["requests==2.31.0"],
+  "requirements": ["requests"],
   "dependencies": [],
   "codeowners": ["@daizihan233"],
   "config_flow": true,
