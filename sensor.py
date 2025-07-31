@@ -1,35 +1,14 @@
+import logging
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import TEMP_CELSIUS
-from .coordinator import TemperatureCoordinator
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from .const import DOMAIN, SENSOR_TYPES
 
-# 手册3.14节提到的传感器列表
-SENSOR_TYPES = {
-    "cpu_thermal": {
-        "name": "CPU Temperature",
-        "icon": "mdi:cpu-64-bit",
-        "unit": TEMP_CELSIUS
-    },
-    "gpu_thermal": {
-        "name": "GPU Temperature",
-        "icon": "mdi:gpu",
-        "unit": TEMP_CELSIUS
-    },
-    "ddr_thermal": {
-        "name": "DDR Temperature",
-        "icon": "mdi:memory",
-        "unit": TEMP_CELSIUS
-    },
-    "ve_thermal": {
-        "name": "VE Temperature",
-        "icon": "mdi:video-3d",
-        "unit": TEMP_CELSIUS
-    }
-}
+_LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """设置传感器实体"""
-    coordinator = TemperatureCoordinator(hass)
-    await coordinator.async_config_entry_first_refresh()
+    coordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     entities = []
     for sensor_id, sensor_info in SENSOR_TYPES.items():
@@ -39,44 +18,39 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     async_add_entities(entities)
 
-class Opiz3TemperatureSensor(SensorEntity):
+class Opiz3TemperatureSensor(CoordinatorEntity, SensorEntity):
     """温度传感器实体"""
 
     def __init__(self, coordinator, sensor_id, sensor_info):
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self.sensor_id = sensor_id
         self._attr_name = f"OPIZ3 {sensor_info['name']}"
         self._attr_unique_id = f"opiz3_{sensor_id}"
         self._attr_native_unit_of_measurement = sensor_info["unit"]
         self._attr_icon = sensor_info["icon"]
+        self._attr_device_class = sensor_info.get("device_class")
 
     @property
     def available(self):
         """实体是否可用"""
-        return self.coordinator.last_update_success
+        return super().available and self.coordinator.data is not None
 
     @property
     def native_value(self):
         """返回当前温度值"""
-        data = self.coordinator.data
-        if data and self.sensor_id in data:
-            return data[self.sensor_id]["current"]
+        if self.coordinator.data and self.sensor_id in self.coordinator.data:
+            return self.coordinator.data[self.sensor_id]["current"]
         return None
 
     @property
     def extra_state_attributes(self):
         """返回额外属性"""
-        data = self.coordinator.data.get(self.sensor_id, {}) if self.coordinator.data else {}
+        if not self.coordinator.data or self.sensor_id not in self.coordinator.data:
+            return {}
+
+        data = self.coordinator.data[self.sensor_id]
         return {
             "high_temp": data.get("high"),
             "critical_temp": data.get("critical"),
-            "last_updated": self.coordinator.last_update_time.isoformat()
+            "last_updated": self.coordinator.last_update_success_time.isoformat() if self.coordinator.last_update_success_time else None
         }
-
-    async def async_added_to_hass(self):
-        """注册更新回调"""
-        self.async_on_remove(
-            self.coordinator.async_add_listener(
-                self.async_write_ha_state
-            )
-        )
