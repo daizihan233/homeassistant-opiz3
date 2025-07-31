@@ -20,7 +20,7 @@ class TemperatureCoordinator(DataUpdateCoordinator):
             update_interval=UPDATE_INTERVAL,
         )
         self.fail_count = 0
-        self.api_url = "http://127.0.0.1:8080/sensors/temperatures"
+        self.api_url = "http://127.0.0.1:8000/sensors/temperatures"
         self.timeout = 5
 
     async def _async_update_data(self):
